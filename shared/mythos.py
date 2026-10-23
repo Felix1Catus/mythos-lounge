@@ -24,7 +24,7 @@ Exit codes: 0 SUCCESS · 1 GENERAL · 2 INVALID_TARGET · 3 SCOPE · 4 DEPENDENC
 
 LOCATION: ~/targets/_shared/mythos.py   (bundle: shared/mythos.py)   shim: `mythos`
 """
-import sys, os, re, json, time, subprocess, datetime, uuid, shutil
+import sys, os, re, json, time, subprocess, datetime, uuid, shutil, threading
 
 SELF = os.path.dirname(os.path.abspath(__file__))
 HOME = os.path.expanduser("~")
@@ -38,6 +38,18 @@ STAGE_FAIL_CODE = {"A": "SCOPE_FAILURE", "B": "DEPENDENCY_FAILURE", "C": "ENUMER
 DOMAIN_RE = re.compile(r'(?<![\w.-])(\*\.)?((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+'
                        r'[a-z]{2,24})(?![\w-])', re.I)
 TARGET_RE = re.compile(r'^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$', re.I)
+
+VERBOSE = True   # live, interactive output (disable with --quiet)
+
+
+def fmt_secs(s):
+    s = int(max(0, s))
+    return "%02d:%02d" % (s // 60, s % 60)
+
+
+def say(msg):
+    if VERBOSE:
+        sys.stdout.write(msg + "\n"); sys.stdout.flush()
 
 
 # ---------------------------------------------------------------- context / ledger
@@ -126,6 +138,7 @@ def run_stage(ctx, key, fn, required=True):
     e = ctx.ledger[key]
     e["status"] = "RUNNING"; e["attempts"] += 1
     persist_manifest(ctx)
+    say("\n\033[1m▶ [%s] %s — running…\033[0m" % (key, ctx.names[key]))
     t0 = time.time()
     try:
         status, detail = fn(ctx)
@@ -145,6 +158,9 @@ def run_stage(ctx, key, fn, required=True):
     if status == "FAILED" and required:
         e["exit"] = EXIT[STAGE_FAIL_CODE[key]]
     persist_manifest(ctx)
+    col = {"SUCCESS": "32", "WARNING": "33", "FAILED": "31", "SKIPPED": "90"}.get(status, "0")
+    say("  \033[%sm[%s] %s\033[0m (%ss)%s" % (col, key, status, e["duration"],
+        " — " + e.get("note", "") if e.get("note") else ""))
     return status
 
 
@@ -192,17 +208,40 @@ def stage_deps(ctx):
 
 
 # ---------------------------------------------------------------- C. enumerate
-def _popen(cmd, timeout, logpath):
-    with open(logpath, "w", encoding="utf-8") as log:
-        p = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=dict(os.environ))
-        try:
-            rc = p.wait(timeout=timeout)
-            return rc, False
-        except subprocess.TimeoutExpired:
-            p.kill()
-            try: p.wait(5)
-            except Exception: pass
-            return None, True
+def _run_streamed(cmd, timeout, logpath, label):
+    """Run a long command, stream its output live, print an elapsed/remaining ticker every
+    15s, and HARD-kill it at `timeout` even if it goes silent. Returns (rc, timed_out)."""
+    t0 = time.time()
+    stop = threading.Event()
+    killed = {"to": False}
+    log = open(logpath, "w", encoding="utf-8")
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                         text=True, bufsize=1, env=dict(os.environ))
+
+    def ticker():
+        while not stop.wait(15):
+            el = time.time() - t0
+            if el >= timeout:
+                killed["to"] = True
+                try: p.kill()
+                except Exception: pass
+                say("    \033[33m[%s] %s elapsed — TIMEOUT (%s), stopping\033[0m"
+                    % (label, fmt_secs(el), fmt_secs(timeout)))
+                return
+            say("    \033[90m[%s] %s elapsed / %s left …\033[0m"
+                % (label, fmt_secs(el), fmt_secs(timeout - el)))
+    th = threading.Thread(target=ticker, daemon=True); th.start()
+    try:
+        for line in p.stdout:
+            log.write(line)
+            ln = line.rstrip("\n")
+            if VERBOSE and ln.strip():
+                sys.stdout.write("    \033[90m│\033[0m " + ln[:160] + "\n"); sys.stdout.flush()
+    except Exception:
+        pass
+    rc = p.wait()
+    stop.set(); log.close()
+    return (None if killed["to"] else rc), killed["to"]
 
 
 def stage_enumerate(ctx):
@@ -221,7 +260,9 @@ def stage_enumerate(ctx):
     cmd = [ctx.bbot, "-t", roots, "-p", "subdomain-enum", "web", "-m", "baddns",
            "-om", "json", "-o", outdir, "-n", name, "-y"]
     log = ctx.tdir("run", "bbot_%s.log" % ctx.run_id)
-    rc, timed_out = _popen(cmd, ctx.opts.get("enum_timeout", 900), log)
+    say("    running bbot on %s (timeout %s); live output below:"
+        % (roots, fmt_secs(ctx.opts.get("enum_timeout", 900))))
+    rc, timed_out = _run_streamed(cmd, ctx.opts.get("enum_timeout", 900), log, "enumerate")
     nd = os.path.join(outdir, name, "output.ndjson")
     if not os.path.exists(nd):
         hits = []
@@ -252,14 +293,28 @@ def stage_enumerate(ctx):
 
 
 # ---------------------------------------------------------------- D. scan
-def _py(ctx, script, *args, timeout=600):
+def _py(ctx, script, *args, timeout=600, stream=False):
     cmd = [sys.executable, tool(ctx, script), ctx.prog] + list(args)
     env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    if not stream:
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
+            return r.returncode, (r.stdout or "") + (r.stderr or "")
+        except Exception as e:
+            return 1, str(e)
+    buf = []
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
-        return r.returncode, (r.stdout or "") + (r.stderr or "")
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                             text=True, bufsize=1, env=env)
+        for line in p.stdout:
+            buf.append(line)
+            if VERBOSE and line.strip():
+                sys.stdout.write("    \033[90m│\033[0m " + line.rstrip()[:160] + "\n")
+                sys.stdout.flush()
+        rc = p.wait(timeout=timeout)
     except Exception as e:
-        return 1, str(e)
+        return 1, "".join(buf) + str(e)
+    return rc, "".join(buf)
 
 
 def stage_scan(ctx):
@@ -268,14 +323,14 @@ def stage_scan(ctx):
     if getattr(ctx, "enum_hosts", 0) == 0:
         return "SKIPPED", {"note": "no eligible in-scope assets"}
     nd = getattr(ctx, "enum_ndjson", "")
-    counts = {}
-    _py(ctx, "rank_surface.py", "--ndjson", nd)                        # initial rank
-    rc, _ = _py(ctx, "takeover_check.py", "--from-surface", "--top", str(ctx.opts.get("top", 25)))
-    counts["takeover"] = rc
-    _py(ctx, "php2shell_check.py", "--from-surface", "--top", str(ctx.opts.get("top", 25)))
+    top = str(ctx.opts.get("top", 25))
+    say("    → ranking surface"); _py(ctx, "rank_surface.py", "--ndjson", nd, stream=True)
+    say("    → confirming subdomain takeovers"); _py(ctx, "takeover_check.py", "--from-surface", "--top", top, stream=True)
+    say("    → PHP2Shell version check"); _py(ctx, "php2shell_check.py", "--from-surface", "--top", top, stream=True)
     if ctx.opts.get("mine_js"):
-        _py(ctx, "js_miner.py", "--from-surface", "--top", str(ctx.opts.get("top", 25)))
-    _py(ctx, "rank_surface.py", "--ndjson", nd, "--top", str(ctx.opts.get("top", 15)))  # re-rank
+        say("    → mining JS (secrets + endpoints)"); _py(ctx, "js_miner.py", "--from-surface", "--top", top, stream=True)
+    say("    → re-ranking with enrichment folded in")
+    _py(ctx, "rank_surface.py", "--ndjson", nd, "--top", str(ctx.opts.get("top", 15)), stream=True)
     sm = ctx.state("SURFACE_MAP.md")
     if not os.path.exists(sm):
         return "FAILED", {"error": "ranking produced no SURFACE_MAP.md"}
@@ -524,6 +579,7 @@ def parse_opts(argv):
         elif a == "--mine-js": opts["mine_js"] = True
         elif a == "--vuln": opts["vuln"] = True
         elif a == "--no-enum": opts["no_enum"] = True
+        elif a == "--quiet": opts["quiet"] = True
         elif a == "--launch-agent": opts["launch_agent"] = True
         elif a == "--top": opts["top"] = int(argv[i + 1]); i += 1
         elif a == "--enum-timeout": opts["enum_timeout"] = int(argv[i + 1]); i += 1
@@ -534,6 +590,8 @@ def parse_opts(argv):
 
 
 def run(target, opts):
+    global VERBOSE
+    VERBOSE = not opts.get("quiet")
     ctx = Ctx(target, opts)
     if opts.get("resume"):
         prior = load_prior(ctx)
