@@ -263,18 +263,24 @@ def stage_enumerate(ctx):
     say("    running bbot on %s (timeout %s); live output below:"
         % (roots, fmt_secs(ctx.opts.get("enum_timeout", 900))))
     rc, timed_out = _run_streamed(cmd, ctx.opts.get("enum_timeout", 900), log, "enumerate")
-    nd = os.path.join(outdir, name, "output.ndjson")
-    if not os.path.exists(nd):
-        hits = []
+    # bbot's json output module is output.json (3.x) or output.ndjson (older) — both are NDJSON.
+    nd = ""
+    for fn in ("output.json", "output.ndjson"):
+        p = os.path.join(outdir, name, fn)
+        if os.path.exists(p):
+            nd = p; break
+    if not nd:
+        cand = []
         for r, _d, fs in os.walk(outdir):
-            if "output.ndjson" in fs:
-                hits.append(os.path.join(r, "output.ndjson"))
-        nd = max(hits, key=os.path.getmtime) if hits else ""
+            for fn in ("output.json", "output.ndjson"):
+                if fn in fs:
+                    cand.append(os.path.join(r, fn))
+        nd = max(cand, key=os.path.getmtime) if cand else ""
     if timed_out and not nd:
         return "FAILED", {"error": "bbot timed out with no output (see %s)" % log}
     if not nd or not os.path.exists(nd):
-        return "FAILED", {"error": "no output.ndjson produced (rc=%s)" % rc, "artifacts": [log]}
-    hosts = set()
+        return "FAILED", {"error": "no output.json/ndjson produced (rc=%s)" % rc, "artifacts": [log]}
+    hosts, resolved, dns_err = set(), set(), False
     try:
         for ln in open(nd, encoding="utf-8", errors="replace"):
             try:
@@ -283,13 +289,23 @@ def stage_enumerate(ctx):
                 continue
             if ev.get("type", "").startswith("DNS_NAME") and ev.get("host"):
                 hosts.add(ev["host"])
+                if ev.get("resolved_hosts"):
+                    resolved.add(ev["host"])
+                if any(str(t).endswith("-error") for t in ev.get("tags", [])):
+                    dns_err = True
     except Exception as e:
-        return "FAILED", {"error": "output.ndjson unreadable/malformed: %s" % e}
+        return "FAILED", {"error": "bbot output unreadable/malformed: %s" % e}
     ctx.enum_ndjson = nd
-    ctx.enum_hosts = len(hosts)
-    if not hosts:
-        return "WARNING", {"note": "enumeration OK, 0 hosts (review)", "artifacts": [nd]}
-    return "SUCCESS", {"note": "%d unique hosts" % len(hosts), "artifacts": [nd]}
+    ctx.enum_hosts = len(resolved)
+    if resolved:
+        return "SUCCESS", {"note": "%d resolved host(s) of %d discovered" % (len(resolved), len(hosts)),
+                           "artifacts": [nd]}
+    if dns_err:
+        return "WARNING", {"note": "bbot ran but resolved 0 hosts — DNS failed (a-error). Its "
+                           "resolvers can't egress; point bbot at a working resolver "
+                           "(e.g. `bbot -c dns.nameservers=[\"1.1.1.1\"]` or fix WSL /etc/resolv.conf)",
+                           "artifacts": [nd]}
+    return "WARNING", {"note": "enumeration OK, 0 resolved hosts (review)", "artifacts": [nd]}
 
 
 # ---------------------------------------------------------------- D. scan

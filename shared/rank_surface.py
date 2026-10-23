@@ -481,7 +481,9 @@ def promote_leads(prog, ranked, roots, top):
 
 def newest_ndjson(prog):
     base = os.path.join(HOME, "targets", prog, "recon")
-    hits = glob.glob(os.path.join(base, "**", "output.ndjson"), recursive=True)
+    # bbot 3.x writes output.json (NDJSON); older writes output.ndjson
+    hits = (glob.glob(os.path.join(base, "**", "output.json"), recursive=True)
+            + glob.glob(os.path.join(base, "**", "output.ndjson"), recursive=True))
     return max(hits, key=os.path.getmtime) if hits else ""
 
 

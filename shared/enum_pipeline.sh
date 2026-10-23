@@ -80,9 +80,10 @@ echo "enum_pipeline: prog=$PROG roots=$ROOTS vuln=$VULN ports=$PORTS passive=$PA
 echo "running: $BBOT -t $ROOTS ${PRESETS[*]} ${MODULES[*]} -om json -o $OUT -n $NAME -y ${DEADLY[*]}"
 "$BBOT" -t "$ROOTS" "${PRESETS[@]}" "${MODULES[@]}" -om json -o "$OUT" -n "$NAME" -y "${DEADLY[@]}"
 RC=$?
-ND="$OUT/$NAME/output.ndjson"
-[[ -f "$ND" ]] || ND="$(ls -t "$HOMET/$PROG/recon"/**/output.ndjson 2>/dev/null | head -1)"
-[[ -f "$ND" ]] || die "bbot produced no output.ndjson (rc=$RC) — check the scan above"
+# bbot 3.x writes output.json (NDJSON); older writes output.ndjson
+ND="$OUT/$NAME/output.json"; [[ -f "$ND" ]] || ND="$OUT/$NAME/output.ndjson"
+[[ -f "$ND" ]] || ND="$(ls -t "$HOMET/$PROG/recon"/**/output.json "$HOMET/$PROG/recon"/**/output.ndjson 2>/dev/null | head -1)"
+[[ -f "$ND" ]] || die "bbot produced no output.json/ndjson (rc=$RC) — check the scan above"
 
 echo
 echo "ranking surface from $ND"
