@@ -428,17 +428,28 @@ def stage_agent(ctx):
     os.makedirs(os.path.dirname(p), exist_ok=True)
     open(p, "w", encoding="utf-8").write(prompt)
     ctx.agent_prompt = p
-    # we do not headless-launch the agent; the package IS the handoff deliverable
+    # claude does NOT auto-read a file as its prompt — it must be passed as the first message.
+    # Write a launcher that feeds AGENT_PROMPT.md to claude as the initial message.
+    launcher = ctx.tdir("reports", "launch_agent.sh")
+    open(launcher, "w", encoding="utf-8").write(
+        "#!/usr/bin/env bash\n"
+        "# Launch Claude Code in this target with the MYTHOS prompt as the first message.\n"
+        'cd "%s" || exit 1\n'
+        'exec claude "$(cat reports/AGENT_PROMPT.md)"\n' % ctx.tdir())
+    try:
+        os.chmod(launcher, 0o755)
+    except Exception:
+        pass
     launched = False
     if ctx.opts.get("launch_agent") and shutil.which("claude") and ctx.authorized:
         try:
-            subprocess.Popen(["claude"], cwd=ctx.tdir())
+            subprocess.Popen(["claude", prompt], cwd=ctx.tdir())   # pass prompt as first message
             launched = True
         except Exception:
             launched = False
-    note = "context package generated -> %s%s" % (p, " ; agent launched" if launched else
-           " ; launch with: cd %s && claude" % ctx.tdir())
-    return "SUCCESS", {"note": note, "artifacts": [p]}
+    note = ("context package -> %s ; LAUNCH: bash %s  (feeds the prompt to claude)%s"
+            % (p, launcher, " ; launched" if launched else ""))
+    return "SUCCESS", {"note": note, "artifacts": [p, launcher]}
 
 
 # ---------------------------------------------------------------- F. report + manifest

@@ -84,9 +84,12 @@ takeovers, checks PHP2Shell, **generates the full target-specific agent prompt**
 summary and exit code. `--authorized` is the one hard gate (no network stage runs without it);
 `--resume` continues from the first incomplete stage; `--mine-js` adds JS secret mining. Then:
 ```bash
-cd ~/targets/acme.com && claude              # launch the agent with its generated prompt
-bash ~/targets/_shared/hunt_status.sh        # dashboard across all targets
+bash ~/targets/acme.com/reports/launch_agent.sh     # launches claude WITH the generated prompt
+# (equivalently: cd ~/targets/acme.com && claude "$(cat reports/AGENT_PROMPT.md)")
+bash ~/targets/_shared/hunt_status.sh               # dashboard across all targets
 ```
+> `claude` does not auto-read a file as its prompt — the prompt must be passed as the first
+> message, which `launch_agent.sh` does for you. Plain `cd … && claude` starts a blank session.
 (The individual tools — `enum_pipeline.sh`, `rank_surface.py`, etc. — still run standalone; see §4.)
 
 ---
