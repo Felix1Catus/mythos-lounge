@@ -1,0 +1,16 @@
+# The agent runs on Linux/WSL/macOS — scripts MUST be LF in the repo and on checkout,
+# or bash/python break with \r errors. Normalize text, force LF for executable formats.
+* text=auto eol=lf
+*.sh   text eol=lf
+*.py   text eol=lf
+*.md   text eol=lf
+*.txt  text eol=lf
+*.json text eol=lf
+
+# Leave binaries alone
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.zip binary
+*.gz  binary

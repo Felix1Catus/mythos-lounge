@@ -1,0 +1,211 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Read",
+      "Write",
+      "Edit",
+      "WebFetch",
+      "WebSearch",
+      "mcp__claude_ai_Gmail",
+      "mcp__claude_ai_Google_Calendar",
+      "mcp__claude_ai_Google_Drive"
+    ],
+    "defaultMode": "bypassPermissions"
+  },
+  "model": "opus",
+  "hooks": {
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /home/RESEARCHER/.claude/mythos/precompact.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|WebFetch|WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /home/RESEARCHER/.claude/mythos/scope_sentry.py",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python3 /home/RESEARCHER/.claude/mythos/secret_sink.py",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python3 /home/RESEARCHER/.claude/mythos/recon_diff.py",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /home/RESEARCHER/.claude/mythos/pretooluse_guard.py",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python3 /home/RESEARCHER/.claude/mythos/supervisor_lane_guard.py"
+          },
+          {
+            "type": "command",
+            "command": "python3 /home/RESEARCHER/.claude/mythos/deadend_guard.py",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python3 /home/RESEARCHER/.claude/mythos/entropy_gate.py",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python3 /home/RESEARCHER/.claude/mythos/instrument_selftest_gate.py",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /home/RESEARCHER/targets/_gate/hooks/gate_hook.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /home/RESEARCHER/.claude/mythos/journal.py",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /home/RESEARCHER/.claude/mythos/persist_nudge.sh",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /home/RESEARCHER/.claude/mythos/error_oracle.py",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python3 /home/RESEARCHER/.claude/mythos/evidence_autolog.py",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python3 /home/RESEARCHER/.claude/mythos/two_fail_loosener.py",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python3 /home/RESEARCHER/.claude/mythos/liveness_watchdog.py",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python3 /home/RESEARCHER/.claude/mythos/secret_sink.py",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python3 /home/RESEARCHER/.claude/mythos/instrument_selftest_gate.py",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python3 /home/RESEARCHER/.claude/mythos/pow_detector.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /home/RESEARCHER/.claude/mythos/session_start.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /home/RESEARCHER/.claude/mythos/context_router.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /home/RESEARCHER/.claude/mythos/stop_guard.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python3 /home/RESEARCHER/.claude/mythos/ceiling_gate.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "/home/RESEARCHER/.claude/mythos/statusline.sh"
+  },
+  "enabledPlugins": {
+    "frontend-design@claude-plugins-official": true
+  },
+  "outputStyle": "MYTHOS",
+  "feedbackDrafts": "off",
+  "effortLevel": "xhigh",
+  "modelSettings": {
+    "claude-opus-5": {
+      "effortLevel": "xhigh"
+    },
+    "claude-opus-4-8": {
+      "effortLevel": "xhigh"
+    }
+  },
+  "tui": "fullscreen",
+  "skipDangerousModePermissionPrompt": true,
+  "theme": "auto",
+  "switchModelsOnFlag": true
+}

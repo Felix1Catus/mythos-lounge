@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Local install artifacts (never part of the framework bundle)
+.mythos-backup-*/
+*.log
+safety.log
+persist_nudge.log
+active_target
+selftest/
+ceiling_nudged_*
+recondiff_nudged_*
+stop_nudged_*
+router_seen/
+
+# Live hunt data — the bundle is framework-only (see REDACTION_NOTES.md)
+targets/*/
+!targets/_shared/
+recon/
+evidence/
+reports/DRAFT_*.md
+STATE/*.ndjson
+*.secrets

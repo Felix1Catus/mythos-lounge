@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# mythos — the single MYTHOS command (shim). Runs the whole staged pipeline.
+#   mythos <target> [--authorized] [--resume] [--top N] [--mine-js] [--enum-timeout S] [--no-enum]
+# Installed to ~/.local/bin/mythos by install.sh; delegates to the toolkit copy.
+exec python3 "$HOME/targets/_shared/mythos.py" "$@"

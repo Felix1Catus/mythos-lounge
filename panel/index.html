@@ -1,0 +1,748 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MYTHOS Control</title>
+<style>
+  :root{
+    --bg:#0a0a0b; --bg2:#121214; --bg3:#17171a; --line:#2a2a2e;
+    --fg:#e6e6e8; --mut:#8a8a92; --dim:#5f5f66;
+    --accent:#c9c9cf; --ok:#7ec97e; --run:#e0c060; --bad:#d87a7a;
+    --warn:#e0b050; --warnbg:#1c1708; --blue:#7db0e0;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 var(--mono);display:flex;flex-direction:column}
+  a{color:var(--blue)}
+  header{display:flex;align-items:center;gap:14px;padding:11px 16px;border-bottom:1px solid var(--line);
+    background:var(--bg2);position:sticky;top:0;z-index:5;flex:none}
+  header h1{font-size:14px;margin:0;letter-spacing:.14em;color:var(--fg);font-weight:600;white-space:nowrap}
+  header .sub{color:var(--dim);font-size:11px}
+  .tgtsel{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .tgtsel label{margin:0;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+  .tgtsel select{min-width:180px}
+  .layout{flex:1;display:flex;min-height:0}
+  nav{width:168px;flex:none;border-right:1px solid var(--line);background:var(--bg2);padding:10px 8px;overflow:auto}
+  .nav-i{display:block;padding:8px 11px;color:var(--mut);border-radius:6px;cursor:pointer;font-size:12px;
+    letter-spacing:.05em;margin-bottom:2px;text-transform:uppercase}
+  .nav-i:hover{color:var(--fg);background:var(--bg3)}
+  .nav-i.active{background:#000;color:var(--fg);border:1px solid #3a3a40}
+  main{flex:1;min-width:0;overflow:auto;padding:20px 22px 80px}
+  .panel{display:none;max-width:1000px} .panel.active{display:block}
+  h2{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);
+    border-bottom:1px solid var(--line);padding-bottom:8px;margin:0 0 16px;display:flex;align-items:center;gap:10px}
+  h2 .r{margin-left:auto;font-size:11px;text-transform:none;letter-spacing:0;color:var(--dim)}
+  label{display:block;color:var(--mut);font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin:14px 0 5px}
+  input,textarea,select{width:100%;background:var(--bg2);color:var(--fg);border:1px solid var(--line);
+    border-radius:6px;padding:9px 11px;font:13px var(--mono)}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:#50505a;background:#000}
+  textarea{resize:vertical;min-height:90px}
+  .row{display:flex;gap:12px} .row>*{flex:1}
+  .btn{display:inline-flex;align-items:center;gap:7px;background:#1d1d21;color:var(--fg);border:1px solid #3a3a40;
+    border-radius:6px;padding:8px 14px;cursor:pointer;font:12px var(--mono);letter-spacing:.05em;text-transform:uppercase}
+  .btn:hover{background:#000;border-color:#52525c}
+  .btn.primary{background:#e6e6e8;color:#000;border-color:#e6e6e8}.btn.primary:hover{background:#fff}
+  .btn.primary:disabled{background:#3a3a40;color:#7a7a82;border-color:#3a3a40;cursor:not-allowed}
+  .btn.danger{border-color:#5a3a3a;color:var(--bad)}.btn.danger:hover{background:#2a1414}
+  .btn.sm{padding:5px 9px;font-size:11px}
+  .hint{color:var(--dim);font-size:11px;margin-top:6px}
+  code{background:#000;border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:var(--accent)}
+  .card{background:var(--bg2);border:1px solid var(--line);border-radius:8px;margin-bottom:12px}
+  .bar{display:flex;gap:10px;align-items:center;margin-top:16px}.bar .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{background:var(--bg2);border:1px solid var(--line);color:var(--accent);border-radius:6px;padding:7px 12px;
+    font-size:12px;cursor:pointer;display:flex;align-items:center;gap:7px}
+  .chip:hover{border-color:#52525c;background:#000}
+  .chip .ex{color:var(--dim);font-size:10px}
+  /* targets list */
+  .trow{display:flex;align-items:center;gap:12px;padding:11px 14px;border:1px solid var(--line);
+    border-radius:8px;background:var(--bg2);margin-bottom:8px}
+  .trow .nm{font-weight:600}
+  .badge{font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:20px;
+    border:1px solid var(--ok);color:var(--ok)}
+  .trow .acts{margin-left:auto;display:flex;gap:6px}
+  /* file tree */
+  .crumb{display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:12px;color:var(--mut);margin-bottom:10px}
+  .crumb a{cursor:pointer}
+  .tree{border:1px solid var(--line);border-radius:8px;background:var(--bg2);overflow:hidden}
+  .te{display:flex;align-items:center;gap:10px;padding:8px 13px;cursor:pointer;border-bottom:1px solid #1d1d20}
+  .te:last-child{border-bottom:none}.te:hover{background:var(--bg3)}
+  .te .ic{width:16px;text-align:center;color:var(--dim)}
+  .te .sz{margin-left:auto;color:var(--dim);font-size:11px}
+  .te.dir .nm{color:var(--blue)}
+  /* journal */
+  .jrow{border:1px solid var(--line);border-radius:6px;background:var(--bg2);padding:8px 11px;margin-bottom:6px;font-size:12px}
+  .jrow .jt{color:var(--dim);font-size:10px}
+  .jrow .jk{color:var(--run)}
+  /* leads */
+  .lead{border:1px solid var(--line);border-radius:8px;background:var(--bg2);padding:11px 13px;margin-bottom:8px}
+  .lead .txt{font-size:13px;line-height:1.45;word-break:break-word}
+  .lead .meta{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:7px}
+  .sbadge{font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding:2px 9px;border-radius:20px;border:1px solid;white-space:nowrap}
+  .sbadge.testing{color:var(--run);border-color:var(--run)}
+  .sbadge.confirmed{color:var(--ok);border-color:var(--ok)}
+  .sbadge.dead{color:var(--dim);border-color:var(--dim)}
+  .sbadge.blocked{color:var(--bad);border-color:var(--bad)}
+  .sbadge.parked{color:var(--blue);border-color:var(--blue)}
+  .sbadge.open{color:var(--mut);border-color:var(--line)}
+  .sev{font-size:10px;font-weight:600;letter-spacing:.04em;padding:2px 7px;border-radius:4px}
+  .sev.CRITICAL,.sev.HIGH{background:#2a1414;color:var(--bad)}
+  .sev.MEDIUM,.sev.MED{background:#2a2410;color:var(--run)}
+  .sev.LOW,.sev.INFO,.sev.INFORMATIONAL{background:#13201a;color:var(--ok)}
+  .where{color:var(--dim);font-size:10px}
+  .chainbox{border:1px solid var(--line);border-left:3px solid var(--run);border-radius:8px;background:var(--bg2);padding:12px 14px;margin-bottom:14px;font-size:12px}
+  .chainbox .ck{color:var(--mut);text-transform:uppercase;font-size:10px;letter-spacing:.06em;margin-top:6px}
+  .chainbox .cv{color:var(--fg);line-height:1.45}
+  .leadcount{display:flex;gap:16px;font-size:11px;color:var(--dim);margin-bottom:12px;flex-wrap:wrap}
+  .leadcount b{color:var(--fg)}
+  /* live terminal */
+  .liveterm{background:#000;border:1px solid var(--line);border-radius:8px;padding:12px 14px;height:60vh;overflow:auto;
+    font-size:12px;line-height:1.5;color:#cfd2cf;white-space:pre-wrap;word-break:break-word;margin:0}
+  .livebar{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+  .livebar label{margin:0}.livebar select{max-width:340px}
+  .livebar .r{margin-left:auto;display:flex;gap:12px;align-items:center}
+  .pill{font-size:11px;color:var(--ok)}
+  /* run/monitor */
+  .auth{border:1px solid var(--warn);background:var(--warnbg);border-radius:8px;padding:14px 16px;margin:18px 0 6px}
+  .auth .atitle{display:flex;align-items:center;gap:8px;color:var(--warn);font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:600}
+  .auth p{color:#c9bb90;font-size:11px;margin:6px 0 0}
+  .auth textarea{min-height:100px;margin-top:10px;border-color:#4a3c18;background:#0d0a04}
+  .scopestat{font-size:11px}.scopestat.set{color:var(--ok)}.scopestat.empty{color:var(--warn)}
+  .conn{padding:14px;border:1px solid var(--line);border-radius:8px;background:var(--bg2);margin-bottom:10px}
+  .conn .chdr{display:flex;gap:10px;align-items:center}
+  .lhead{display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer}.lhead:hover{background:var(--bg3)}
+  .dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .dot.running{background:var(--run);box-shadow:0 0 8px var(--run);animation:pulse 1.2s infinite}
+  .dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.detached{background:var(--dim)}
+  @keyframes pulse{50%{opacity:.35}}
+  .lname{font-weight:600}.lmeta{color:var(--dim);font-size:11px}
+  .lstat{margin-left:auto;font-size:11px;color:var(--mut);letter-spacing:.06em;text-transform:uppercase}
+  .lbody{display:none;border-top:1px solid var(--line);padding:14px}.lbody.open{display:block}
+  pre.log,pre.out{background:#000;border:1px solid var(--line);border-radius:6px;padding:12px;max-height:340px;
+    overflow:auto;font-size:12px;color:#cfd2cf;white-space:pre-wrap;word-break:break-word;margin:8px 0 0}
+  .kv{color:var(--dim);font-size:11px;margin:2px 0}.kv b{color:var(--mut);font-weight:400}
+  .intr{display:flex;gap:8px;margin-top:10px}.intr input{flex:1}
+  .empty{color:var(--dim);text-align:center;padding:36px;border:1px dashed var(--line);border-radius:8px}
+  /* editor overlay */
+  .ovl{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:40;padding:28px}
+  .ovl.open{display:flex}
+  .edit{margin:auto;width:100%;max-width:980px;height:100%;background:var(--bg2);border:1px solid #3a3a40;
+    border-radius:10px;display:flex;flex-direction:column;overflow:hidden}
+  .ehdr{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--bg3)}
+  .ehdr .pth{font-size:12px;color:var(--mut);word-break:break-all}
+  .ehdr .pth b{color:var(--fg)}
+  .ehdr .d{color:var(--run);font-size:11px;margin-left:4px}
+  .ehdr .r{margin-left:auto;display:flex;gap:8px}
+  .edit textarea{flex:1;border:none;border-radius:0;background:#000;resize:none;font-size:13px;line-height:1.55;min-height:0}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#000;border:1px solid #3a3a40;
+    border-radius:6px;padding:10px 18px;color:var(--fg);font-size:12px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <h1>MYTHOS · CONTROL</h1>
+  <span class="sub" id="detected"></span>
+  <div class="tgtsel">
+    <label>active target</label>
+    <select id="curTarget"></select>
+  </div>
+</header>
+
+<div class="layout">
+  <nav>
+    <div class="nav-i active" data-s="targets">Targets</div>
+    <div class="nav-i" data-s="leads">Leads</div>
+    <div class="nav-i" data-s="live">Live</div>
+    <div class="nav-i" data-s="state">State</div>
+    <div class="nav-i" data-s="files">Files</div>
+    <div class="nav-i" data-s="journal">Journal</div>
+    <div class="nav-i" data-s="run">Run &amp; Monitor</div>
+    <div class="nav-i" data-s="doctrine">Doctrine</div>
+    <div class="nav-i" data-s="lounge">Lounge</div>
+  </nav>
+
+  <main>
+    <!-- TARGETS -->
+    <section class="panel active" id="s-targets">
+      <h2>Targets <span class="r" id="tgtDir"></span></h2>
+      <div class="row">
+        <div><label>New target (your own project)</label><input id="newName" placeholder="my-app" autocomplete="off"></div>
+        <div style="flex:none;display:flex;align-items:flex-end"><button class="btn primary" id="newBtn">+ Scaffold</button></div>
+      </div>
+      <div id="tgtList" style="margin-top:18px"></div>
+      <pre class="out" id="tgtOut" style="display:none"></pre>
+    </section>
+
+    <!-- LEADS -->
+    <section class="panel" id="s-leads">
+      <h2>Leads — live findings <span class="r" id="leadTgt"></span></h2>
+      <p class="hint">Findings for the active target in plain language, parsed from <code>STATE/LEADS.md</code> + <code>CHAIN_LEDGER.md</code> as the agent writes them. Auto-refreshes every 3s. <span id="leadLive" style="color:var(--ok)"></span></p>
+      <div id="chainBox" style="margin-top:12px;display:none"></div>
+      <div class="leadcount" id="leadCount"></div>
+      <div id="leadList"></div>
+    </section>
+
+    <!-- LIVE -->
+    <section class="panel" id="s-live">
+      <h2>Live — terminal / progress log <span class="r" id="liveTgt"></span></h2>
+      <div class="livebar">
+        <label>Source</label>
+        <select id="liveSrc"></select>
+        <div class="r">
+          <span class="pill" id="livePill"></span>
+          <label style="text-transform:none;letter-spacing:0;display:flex;align-items:center;gap:6px;color:var(--mut)">
+            <input type="checkbox" id="liveFollow" style="width:auto" checked> follow</label>
+          <button class="btn sm" id="liveClear">clear</button>
+        </div>
+      </div>
+      <pre class="liveterm" id="liveTerm">…</pre>
+      <p class="hint"><b>Journal</b> streams the agent's auto-journaled actions for the active target (works for the interactive CLI hunt too). <b>Launch</b> tails a panel-run process's raw output. Refreshes every 1.5s.</p>
+    </section>
+
+    <!-- STATE -->
+    <section class="panel" id="s-state">
+      <h2>State files <span class="r" id="stTgt"></span></h2>
+      <p class="hint">The agent's file-as-brain for the active target. Click a file to view/edit it. Saved straight to <code>~/targets/&lt;target&gt;/STATE/</code>.</p>
+      <div class="chips" id="stateChips" style="margin-top:14px"></div>
+    </section>
+
+    <!-- FILES -->
+    <section class="panel" id="s-files">
+      <h2>Files <span class="r">browse &amp; edit any project file</span></h2>
+      <label>Root</label>
+      <select id="fileRoot"></select>
+      <div class="crumb" id="crumb" style="margin-top:12px"></div>
+      <div class="tree" id="tree"></div>
+    </section>
+
+    <!-- JOURNAL -->
+    <section class="panel" id="s-journal">
+      <h2>Journal <span class="r" id="jTgt"></span></h2>
+      <p class="hint">Auto-journaled tool calls from <code>STATE/JOURNAL.ndjson</code> (most recent last). <button class="btn sm" id="jReload" style="margin-left:8px">reload</button></p>
+      <div id="journal" style="margin-top:12px"></div>
+    </section>
+
+    <!-- RUN -->
+    <section class="panel" id="s-run">
+      <h2>Run &amp; Monitor</h2>
+      <label>Connector <span style="color:var(--dim)">(how the agent CLI is invoked)</span></label>
+      <select id="lConn"></select>
+      <div class="row">
+        <div><label>Target name</label><input id="lName" placeholder="my-app" autocomplete="off"></div>
+        <div><label>Target — link / description</label><input id="lTarget" placeholder="https://myapp.local  — or —  'my GraphQL API'"></div>
+      </div>
+      <div class="auth">
+        <div class="atitle">⚠ Authorized scope — the agent tests only what is written here</div>
+        <p>Saved to <code>~/targets/&lt;name&gt;/STATE/SCOPE.md</code>. Anything not listed is out of scope. Self-owned assets only.</p>
+        <textarea id="lScope"></textarea>
+        <div class="bar" style="margin-top:10px"><span class="scopestat empty" id="scopeStat">no scope loaded</span>
+          <div class="right"><button class="btn sm" id="saveScope">Save scope</button></div></div>
+      </div>
+      <label>Prompt</label>
+      <textarea id="lPrompt" placeholder="Ground on STATE, map the auth model, fire one structural probe, persist."></textarea>
+      <div class="bar">
+        <label style="margin:0;text-transform:none;letter-spacing:0;display:flex;align-items:center;gap:8px;color:var(--mut)">
+          <input type="checkbox" id="lScaffold" style="width:auto" checked> scaffold target dir</label>
+        <div class="right">
+          <button class="btn sm" id="connToggle">connectors ▾</button>
+          <button class="btn primary" id="doLaunch">▶ Launch</button>
+        </div>
+      </div>
+      <div id="connEdit" style="display:none;margin-top:14px">
+        <div id="connList"></div>
+        <div class="bar"><button class="btn sm" id="addConn">+ add connector</button>
+          <div class="right"><span class="hint" id="connDirty" style="margin:0"></span><button class="btn sm primary" id="saveConn">save connectors</button></div></div>
+      </div>
+      <h2 style="margin-top:26px">Monitor</h2>
+      <div id="launchList"></div>
+    </section>
+
+    <!-- DOCTRINE -->
+    <section class="panel" id="s-doctrine">
+      <h2>Doctrine <span class="r">the rules + skills the agent loads</span></h2>
+      <label>Core files</label>
+      <div class="chips" id="docFiles"></div>
+      <label style="margin-top:18px">Skills <span id="skillCount" style="color:var(--dim)"></span></label>
+      <div class="chips" id="docSkills"></div>
+    </section>
+
+    <!-- LOUNGE -->
+    <section class="panel" id="s-lounge">
+      <h2>Lounge <span class="r">two agents, one target</span></h2>
+      <p class="hint">Installs the shared board for the active target so two seats can work it without colliding. The live feed (<code>watch_feed.sh</code>) is a terminal command.</p>
+      <div class="bar" style="margin-top:12px">
+        <button class="btn" id="loungeInstall">Install (2 seats)</button>
+        <button class="btn danger" id="loungeStop">Stop</button>
+        <span class="hint" id="loungeTgt" style="margin:0"></span>
+      </div>
+      <pre class="out" id="loungeOut" style="display:none"></pre>
+      <p class="hint" style="margin-top:14px">Live board: <code>bash ~/targets/_shared/lounge/watch_feed.sh --program &lt;target&gt;</code></p>
+    </section>
+  </main>
+</div>
+
+<!-- editor overlay -->
+<div class="ovl" id="ovl">
+  <div class="edit">
+    <div class="ehdr">
+      <div class="pth" id="edPath"></div><span class="d" id="edDirty"></span>
+      <div class="r">
+        <button class="btn sm" id="edReload">Reload</button>
+        <button class="btn sm primary" id="edSave">Save</button>
+        <button class="btn sm" id="edClose">Close</button>
+      </div>
+    </div>
+    <textarea id="edText" spellcheck="false"></textarea>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+function esc(s){return(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1900);}
+// resilient fetch: never throws, returns null on failure
+async function api(path,opts){try{const r=await fetch(path,opts);if(!r.ok&&r.status>=500)return null;return await r.json();}catch(e){return null;}}
+
+let TG={targets:[],active:'',state_files:[],subdirs:[],targets_dir:''};
+let current='';                 // selected target
+let homeDir='';                 // derived from targets_dir
+
+const DEFAULT_SCOPE=`# AUTHORIZED SCOPE — self-owned assets only (my own projects)
+# I own or am the sole operator of every target below. This authorizes full-depth
+# security testing of MY OWN assets. Anything I do not own is NEVER in scope.
+
+IN SCOPE — all assets I own / solely operate:
+  - my domains/subdomains/paths and every environment I run (local, dev, staging, prod)
+  - my APIs, services, auth flows, sessions, tokens, and my own test accounts
+  - infrastructure I administer (servers, dbs, configs) and localhost/*.test
+
+VULN CLASSES — all of them: authz/IDOR/BOLA, injection, XSS/CSRF, SSRF/RCE,
+  logic/race/parser-diff, infra/secret disclosure. Chain to the ceiling.
+
+OUT OF SCOPE — hard: anything I do NOT own, shared/multi-tenant systems I am not
+  sole tenant of, destructive actions on real production data, others' data.
+
+RULES: probe not assert; one minimal PoC per finding; never leave a destructive primitive armed.`;
+
+// ---------- nav ----------
+$$('.nav-i').forEach(n=>n.onclick=()=>showSection(n.dataset.s));
+function showSection(id){
+  $$('.nav-i').forEach(x=>x.classList.toggle('active',x.dataset.s===id));
+  $$('.panel').forEach(x=>x.classList.remove('active'));
+  $('#s-'+id).classList.add('active');
+  if(id==='targets') loadTargets();
+  if(id==='leads') startLeads();
+  if(id==='live') startLive();
+  if(id==='state') renderState();
+  if(id==='files') initFiles();
+  if(id==='journal') loadJournal();
+  if(id==='run') refreshState();
+  if(id==='doctrine') loadDoctrine();
+  if(id==='lounge') $('#loungeTgt').textContent=current?('target: '+current):'(no target selected)';
+}
+
+// ---------- target selector ----------
+$('#curTarget').onchange=e=>{current=e.target.value;onTargetChange();};
+function onTargetChange(){
+  $('#stTgt').textContent=current?('target: '+current):'';
+  $('#jTgt').textContent=current?('target: '+current):'';
+  $('#loungeTgt').textContent=current?('target: '+current):'';
+  if($('#s-state').classList.contains('active')) renderState();
+  if($('#s-journal').classList.contains('active')) loadJournal();
+  if($('#s-files').classList.contains('active')) initFiles();
+  if($('#s-leads').classList.contains('active')) loadLeads();
+  if($('#s-live').classList.contains('active')) startLive();
+}
+
+// ---------- LIVE (terminal / progress log) ----------
+let liveTimer=null, liveMode='journal', liveLaunchId='', liveOffset=0;
+$('#liveClear').onclick=()=>{$('#liveTerm').textContent='';liveOffset=0;};
+function liveAtBottom(){const p=$('#liveTerm');return p.scrollTop+p.clientHeight>=p.scrollHeight-24;}
+function fmtJournal(e){
+  if(e.raw)return e.raw;
+  const ts=(e.ts||e.time||'').toString().slice(11,19);
+  const tool=(e.tool||e.event||'').toString().slice(0,8).padEnd(8);
+  const ok=e.ok;const flag=ok==null?'· ':(ok?'ok':'XX');
+  const sm=(e.sum||e.summary||'').toString().slice(0,150);
+  const out=e.out?(' → '+String(e.out).slice(0,90)):'';
+  return `${ts}  ${flag}  ${tool} ${sm}${out}`;
+}
+async function populateLiveSrc(){
+  const s=await api('/api/state'); if(s)STATE=s;
+  const sel=$('#liveSrc');
+  let opts=`<option value="journal">Journal · ${esc(current||'(no target)')}</option>`;
+  (STATE.launches||[]).forEach(l=>{opts+=`<option value="log:${esc(l.id)}">${esc(l.name)} · ${esc(l.status)}</option>`;});
+  sel.innerHTML=opts;
+  sel.onchange=()=>{const v=sel.value;$('#liveTerm').textContent='';liveOffset=0;
+    if(v.startsWith('log:')){liveMode='log';liveLaunchId=v.slice(4);}else{liveMode='journal';liveLaunchId='';}
+    tickLive();};
+}
+async function startLive(){
+  await populateLiveSrc();
+  clearInterval(liveTimer);
+  tickLive();
+  liveTimer=setInterval(()=>{if($('#s-live').classList.contains('active'))tickLive();else{clearInterval(liveTimer);liveTimer=null;}},1500);
+}
+async function tickLive(){
+  $('#liveTgt').textContent=current?('target: '+current):'';
+  const term=$('#liveTerm');
+  if(liveMode==='journal'){
+    if(!current){term.textContent='(select a target in the header)';$('#livePill').textContent='';return;}
+    const d=await api('/api/journal?target='+encodeURIComponent(current));
+    if(!d){$('#livePill').textContent='(offline)';return;}
+    $('#livePill').textContent='● live';
+    term.textContent=(d.lines||[]).map(fmtJournal).join('\n')||'(no journaled actions yet — the agent writes here as it runs tools)';
+    if($('#liveFollow').checked)term.scrollTop=term.scrollHeight;
+  }else{
+    const r=await api('/api/log?id='+encodeURIComponent(liveLaunchId)+'&offset='+liveOffset);
+    if(!r){$('#livePill').textContent='(offline)';return;}
+    if(r.error){term.textContent=r.error;return;}
+    $('#livePill').textContent='● '+(r.status||'');
+    if(r.data){const bottom=liveAtBottom();term.textContent+=r.data;if($('#liveFollow').checked&&bottom)term.scrollTop=term.scrollHeight;}
+    liveOffset=r.offset;
+  }
+}
+
+// ---------- LEADS (real-time findings) ----------
+let leadTimer=null;
+function startLeads(){
+  loadLeads();
+  clearInterval(leadTimer);
+  leadTimer=setInterval(()=>{
+    if($('#s-leads').classList.contains('active')) loadLeads();
+    else{clearInterval(leadTimer);leadTimer=null;}
+  },3000);
+}
+const STATUS_ORDER={confirmed:0,testing:1,blocked:2,open:3,parked:4,dead:5};
+function loadLeads(){
+  $('#leadTgt').textContent=current?('target: '+current):'';
+  const list=$('#leadList'),cbox=$('#chainBox'),cnt=$('#leadCount');
+  if(!current){list.innerHTML='<div class="empty">select a target in the header first</div>';cbox.style.display='none';cnt.innerHTML='';return;}
+  api('/api/leads?target='+encodeURIComponent(current)).then(d=>{
+    if(!d){$('#leadLive').textContent='(offline — retrying)';return;}
+    $('#leadLive').textContent='● live';
+    const c=d.chain||{};
+    if(c.active||c.floor||c.ceiling||c.missing||c.rung){
+      cbox.style.display='block';
+      cbox.innerHTML=(c.active?'<div class="ck">active chain</div><div class="cv">'+esc(c.active)+'</div>':'')
+        +(c.floor?'<div class="ck">floor · proven</div><div class="cv">'+esc(c.floor)+'</div>':'')
+        +(c.ceiling?'<div class="ck">ceiling · one more link</div><div class="cv">'+esc(c.ceiling)+'</div>':'')
+        +(c.missing?'<div class="ck">missing link</div><div class="cv">'+esc(c.missing)+'</div>':'')
+        +(c.rung?'<div class="ck">current rung</div><div class="cv">'+esc(c.rung)+'</div>':'');
+    }else cbox.style.display='none';
+    const f=d.findings||[];
+    if(!f.length){list.innerHTML='<div class="empty">no findings yet — they appear here as the agent writes to LEADS.md</div>';cnt.innerHTML='';return;}
+    const by={};f.forEach(x=>by[x.status]=(by[x.status]||0)+1);
+    cnt.innerHTML=['confirmed','testing','blocked','open','parked','dead'].filter(s=>by[s])
+      .map(s=>`<span><b>${by[s]}</b> ${s}</span>`).join('');
+    const sorted=f.slice().sort((a,b)=>(STATUS_ORDER[a.status]??9)-(STATUS_ORDER[b.status]??9));
+    list.innerHTML='';
+    sorted.forEach(x=>{
+      const el=document.createElement('div');el.className='lead';
+      el.innerHTML=`<div class="txt">${esc(x.text)}</div><div class="meta">
+        <span class="sbadge ${x.status}">${esc(x.status)}</span>
+        ${x.sev?`<span class="sev ${esc(x.sev)}">${esc(x.sev)}</span>`:''}
+        <span class="where">${esc(x.where)}${(x.raw_status&&x.raw_status.toLowerCase()!==x.where)?(' · '+esc(x.raw_status)):''}</span>
+      </div>`;
+      list.appendChild(el);
+    });
+  });
+}
+async function loadTargets(){
+  const d=await api('/api/targets'); if(!d)return;
+  TG=d; homeDir=(d.targets_dir||'').replace(/\/targets$/,'');
+  if(!current) current=d.active||d.targets[0]||'';
+  // header select
+  const sel=$('#curTarget');
+  sel.innerHTML=d.targets.map(t=>`<option value="${esc(t)}" ${t===current?'selected':''}>${esc(t)}${t===d.active?'  (active)':''}</option>`).join('')
+    ||'<option value="">— none —</option>';
+  if(current) sel.value=current;
+  $('#tgtDir').textContent=d.targets_dir;
+  // list
+  const box=$('#tgtList');
+  if(!d.targets.length){box.innerHTML='<div class="empty">no targets yet — scaffold one above</div>';return;}
+  box.innerHTML='';
+  d.targets.forEach(t=>{
+    const el=document.createElement('div');el.className='trow';
+    el.innerHTML=`<span class="nm">${esc(t)}</span>${t===d.active?'<span class="badge">active</span>':''}
+      <div class="acts">
+        <button class="btn sm" data-a="activate" data-t="${esc(t)}">activate</button>
+        <button class="btn sm" data-a="resume" data-t="${esc(t)}">warm-boot</button>
+        <button class="btn sm danger" data-a="delete" data-t="${esc(t)}">delete</button>
+      </div>`;
+    box.appendChild(el);
+  });
+  box.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>tgtAction(b.dataset.a,b.dataset.t));
+}
+async function tgtAction(action,target){
+  if(action==='delete'&&!confirm('Delete target "'+target+'" and all its STATE/notes/evidence? This cannot be undone.'))return;
+  const out=$('#tgtOut');out.style.display='block';out.textContent='running '+action+' '+target+'…';
+  const r=await api('/api/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,name:target})});
+  if(!r){out.textContent='⚠ panel unreachable';return;}
+  if(r.error){out.textContent='⚠ '+r.error;return;}
+  out.textContent=(r.out||'').trim()||('done ('+action+')');
+  if(action==='activate') current=target;
+  if(action==='delete'&&current===target) current='';
+  await loadTargets();
+}
+$('#newBtn').onclick=async()=>{
+  const name=$('#newName').value.trim(); if(!name){toast('enter a name');return;}
+  const out=$('#tgtOut');out.style.display='block';out.textContent='scaffolding '+name+'…';
+  const r=await api('/api/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'new',name})});
+  if(!r||r.error){out.textContent='⚠ '+((r&&r.error)||'unreachable');return;}
+  out.textContent=(r.out||'').trim();$('#newName').value='';current=name;await loadTargets();toast('scaffolded '+name);
+};
+
+// ---------- STATE ----------
+function renderState(){
+  const box=$('#stateChips');$('#stTgt').textContent=current?('target: '+current):'';
+  if(!current){box.innerHTML='<div class="empty">select a target in the header first</div>';return;}
+  box.innerHTML='';
+  (TG.state_files||[]).forEach(f=>{
+    const c=document.createElement('span');c.className='chip';c.innerHTML=esc(f);
+    c.onclick=()=>openEditor(TG.targets_dir+'/'+current+'/STATE/'+f);
+    box.appendChild(c);
+  });
+}
+
+// ---------- FILES ----------
+let fileRoot='', filePath='';
+function rootsList(){
+  const r=[];
+  if(current) r.push({label:'target: '+current, path:TG.targets_dir+'/'+current});
+  r.push({label:'~/targets/_shared', path:TG.targets_dir+'/_shared'});
+  if(homeDir){
+    r.push({label:'~/.claude', path:homeDir+'/.claude'});
+    r.push({label:'~/.kimi-code', path:homeDir+'/.kimi-code'});
+    r.push({label:'~/.grok', path:homeDir+'/.grok'});
+  }
+  return r;
+}
+function initFiles(){
+  const sel=$('#fileRoot'),roots=rootsList();
+  sel.innerHTML=roots.map(r=>`<option value="${esc(r.path)}">${esc(r.label)}</option>`).join('');
+  sel.onchange=()=>{fileRoot=sel.value;loadTree(fileRoot);};
+  fileRoot=roots[0]?roots[0].path:''; if(fileRoot){sel.value=fileRoot;loadTree(fileRoot);}
+  else $('#tree').innerHTML='<div class="empty">no target selected</div>';
+}
+async function loadTree(path){
+  filePath=path;
+  const d=await api('/api/tree?path='+encodeURIComponent(path));
+  const tree=$('#tree'),crumb=$('#crumb');
+  if(!d||d.error){tree.innerHTML='<div class="empty">'+esc((d&&d.error)||'unreachable')+'</div>';crumb.innerHTML='';return;}
+  // breadcrumb relative to fileRoot
+  const rel=d.path.startsWith(fileRoot)?d.path.slice(fileRoot.length):d.path;
+  const parts=rel.split('/').filter(Boolean);let acc=fileRoot;
+  let html='<a data-p="'+esc(fileRoot)+'">'+esc(fileRoot.split('/').pop())+'</a>';
+  parts.forEach(p=>{acc+='/'+p;html+=' / <a data-p="'+esc(acc)+'">'+esc(p)+'</a>';});
+  crumb.innerHTML=html;crumb.querySelectorAll('a').forEach(a=>a.onclick=()=>loadTree(a.dataset.p));
+  if(!d.entries.length){tree.innerHTML='<div class="empty">empty</div>';return;}
+  tree.innerHTML='';
+  d.entries.forEach(e=>{
+    const el=document.createElement('div');el.className='te'+(e.dir?' dir':'');
+    el.innerHTML=`<span class="ic">${e.dir?'▸':'·'}</span><span class="nm">${esc(e.name)}</span>`+
+      (e.dir?'':`<span class="sz">${e.size} b</span>`);
+    el.onclick=()=> e.dir?loadTree(e.path):openEditor(e.path);
+    tree.appendChild(el);
+  });
+}
+
+// ---------- JOURNAL ----------
+async function loadJournal(){
+  $('#jTgt').textContent=current?('target: '+current):'';
+  const box=$('#journal');
+  if(!current){box.innerHTML='<div class="empty">select a target first</div>';return;}
+  const d=await api('/api/journal?target='+encodeURIComponent(current));
+  if(!d){box.innerHTML='<div class="empty">unreachable</div>';return;}
+  if(!d.lines.length){box.innerHTML='<div class="empty">'+esc(d.note||'no journal entries yet')+'</div>';return;}
+  box.innerHTML='';
+  d.lines.slice().reverse().forEach(e=>{
+    const el=document.createElement('div');el.className='jrow';
+    if(e.raw){el.textContent=e.raw;}
+    else{
+      const t=e.ts||e.time||e.t||'';const k=e.tool||e.event||e.phase||e.type||'';
+      const rest=Object.entries(e).filter(([x])=>!['ts','time','t','tool','event','phase','type'].includes(x))
+        .map(([x,v])=>x+'='+(typeof v==='object'?JSON.stringify(v):String(v))).join('  ').slice(0,300);
+      el.innerHTML=`<span class="jt">${esc(t)}</span> <span class="jk">${esc(k)}</span><br>${esc(rest)}`;
+    }
+    box.appendChild(el);
+  });
+}
+
+// ---------- DOCTRINE ----------
+async function loadDoctrine(){
+  const d=await api('/api/doctrine'); if(!d)return;
+  const fb=$('#docFiles');fb.innerHTML='';
+  d.files.forEach(f=>{
+    const c=document.createElement('span');c.className='chip';
+    c.innerHTML=esc(f.label)+(f.exists?'':' <span class="ex">(missing)</span>');
+    if(f.exists) c.onclick=()=>openEditor(f.path);
+    fb.appendChild(c);
+  });
+  $('#skillCount').textContent='('+d.skills.length+')';
+  const sb=$('#docSkills');sb.innerHTML='';
+  d.skills.forEach(s=>{
+    const c=document.createElement('span');c.className='chip';c.textContent=s.name;
+    c.onclick=()=>openEditor(s.path);sb.appendChild(c);
+  });
+}
+
+// ---------- LOUNGE ----------
+$('#loungeInstall').onclick=()=>loungeAction('lounge-install');
+$('#loungeStop').onclick=()=>loungeAction('lounge-stop');
+async function loungeAction(action){
+  if(!current){toast('select a target first');return;}
+  const out=$('#loungeOut');out.style.display='block';out.textContent=action+' '+current+'…';
+  const r=await api('/api/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,name:current})});
+  out.textContent=!r?'⚠ unreachable':(r.error?('⚠ '+r.error):((r.out||'').trim()||'done'));
+}
+
+// ---------- EDITOR OVERLAY ----------
+let edPath='', edOrig='';
+async function openEditor(path){
+  const d=await api('/api/file?path='+encodeURIComponent(path));
+  if(!d||d.error){toast('⚠ '+((d&&d.error)||'cannot open'));return;}
+  edPath=d.path;edOrig=d.content;
+  $('#edPath').innerHTML='<b>'+esc(d.path.split('/').pop())+'</b> &nbsp;'+esc(d.path)+(d.truncated?' (truncated)':'');
+  $('#edText').value=d.content;setEdDirty(false);
+  $('#ovl').classList.add('open');$('#edText').focus();
+}
+function setEdDirty(x){$('#edDirty').textContent=x?'● unsaved':'';}
+$('#edText').oninput=()=>setEdDirty($('#edText').value!==edOrig);
+async function saveEditor(){
+  const content=$('#edText').value;
+  const r=await api('/api/file',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:edPath,content})});
+  if(!r||r.error){toast('⚠ '+((r&&r.error)||'save failed'));return;}
+  edOrig=content;setEdDirty(false);toast('saved '+edPath.split('/').pop());
+}
+function closeEditor(){
+  if($('#edText').value!==edOrig&&!confirm('Discard unsaved changes?'))return;
+  $('#ovl').classList.remove('open');
+}
+$('#edSave').onclick=saveEditor;
+$('#edClose').onclick=closeEditor;
+$('#edReload').onclick=()=>openEditor(edPath);
+document.addEventListener('keydown',e=>{
+  if(!$('#ovl').classList.contains('open'))return;
+  if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();saveEditor();}
+  if(e.key==='Escape')closeEditor();
+});
+
+// ---------- RUN / MONITOR (connectors, launch, scope, logs) ----------
+let STATE={connectors:[],launches:[],detected:[]},connectors=[],connDirty=false;
+const openCards=new Set(),logOffsets={},cardEls=new Map();
+$('#connToggle').onclick=()=>{const e=$('#connEdit');e.style.display=e.style.display==='none'?'block':'none';};
+function renderConnectors(){
+  const box=$('#connList');box.innerHTML='';
+  connectors.forEach((c,i)=>{
+    const el=document.createElement('div');el.className='conn';
+    el.innerHTML=`<div class="chdr"><input value="${esc(c.name)}" data-k="name" data-i="${i}" style="font-weight:600">
+      <button class="btn sm danger" data-del="${i}">remove</button></div>
+      <label>Command template <span style="color:var(--dim)">{prompt} {target} {name} {cwd}</span></label>
+      <textarea data-k="command" data-i="${i}" style="min-height:52px">${esc(c.command)}</textarea>
+      <label>Working dir</label><input value="${esc(c.cwd||'~')}" data-k="cwd" data-i="${i}">`;
+    box.appendChild(el);
+  });
+  box.oninput=e=>{const i=e.target.dataset.i,k=e.target.dataset.k;if(i!=null&&k){connectors[i][k]=e.target.value;connDirty=true;$('#connDirty').textContent='unsaved';syncConnSel();}};
+  box.onclick=e=>{const d=e.target.dataset.del;if(d!=null){connectors.splice(+d,1);renderConnectors();connDirty=true;}};
+  syncConnSel();
+}
+function syncConnSel(){const sel=$('#lConn'),cur=sel.value;sel.innerHTML=connectors.map(c=>`<option>${esc(c.name)}</option>`).join('');if([...sel.options].some(o=>o.value===cur))sel.value=cur;}
+$('#addConn').onclick=()=>{connectors.push({name:'new-connector',command:'your-cli -p {prompt}',cwd:'~/targets/{name}'});renderConnectors();connDirty=true;};
+$('#saveConn').onclick=async()=>{const r=await api('/api/connectors',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({connectors})});if(!r){toast('⚠ unreachable');return;}connDirty=false;$('#connDirty').textContent='';toast('saved '+r.count+' connectors');};
+
+// scope wiring
+function updateScopeStat(){const v=$('#lScope').value.trim(),name=$('#lName').value.trim();
+  const el=$('#scopeStat');
+  if(!name){el.className='scopestat empty';el.textContent='enter a target name to save its scope';return;}
+  const path='~/targets/'+name+'/STATE/SCOPE.md';
+  if(v){el.className='scopestat set';el.textContent='✓ scope set · '+v.split('\n').length+' lines · '+path;}
+  else{el.className='scopestat empty';el.textContent='⚠ no scope — nothing authorized';}}
+let nameTimer=null;
+$('#lName').oninput=()=>{updateScopeStat();clearTimeout(nameTimer);nameTimer=setTimeout(loadScope,400);};
+$('#lScope').oninput=updateScopeStat;
+function isPlaceholderScope(s){return !s || s.includes('- [ ]') || s.includes("What's not written here is not scoped");}
+async function loadScope(){const name=$('#lName').value.trim();if(!name)return;
+  const r=await api('/api/scope?name='+encodeURIComponent(name));if(!r)return;
+  if(isPlaceholderScope(r.scope)){
+    // auto-approve: self-owned target is pre-approved; the scope is written to
+    // disk on launch (backend ensure_scope), so it's "allowed" instantly.
+    if(document.activeElement!==$('#lScope'))$('#lScope').value=DEFAULT_SCOPE;
+    const el=$('#scopeStat');el.className='scopestat set';
+    el.textContent='✓ auto-approved (self-owned) · written to ~/targets/'+name+'/STATE/SCOPE.md on launch';
+  }else{
+    if(document.activeElement!==$('#lScope'))$('#lScope').value=r.scope;updateScopeStat();
+  }}
+$('#saveScope').onclick=async()=>{const name=$('#lName').value.trim();if(!name){toast('need a target name');return;}
+  const r=await api('/api/scope',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,scope:$('#lScope').value})});
+  if(!r||r.error){toast('⚠ '+((r&&r.error)||'unreachable'));return;}updateScopeStat();toast('scope saved');};
+
+$('#doLaunch').onclick=async()=>{
+  const name=$('#lName').value.trim();
+  // auto-approved: self-owned targets are pre-approved, backend ensures the
+  // scope is written on launch — no confirmation gate.
+  const btn=$('#doLaunch');btn.disabled=true;
+  try{
+    const body={connector:$('#lConn').value,name,target:$('#lTarget').value,prompt:$('#lPrompt').value,scope:$('#lScope').value,scaffold:$('#lScaffold').checked};
+    const r=await api('/api/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!r||r.error){toast('⚠ '+((r&&r.error)||'unreachable'));return;}
+    toast('launched '+r.id);openCards.add(r.id);await refreshState();
+  }finally{btn.disabled=false;}
+};
+
+function dotClass(s){if(s==='running')return'running';if(s==='exited 0')return'ok';if(s.startsWith('exited'))return'bad';return'detached';}
+function createCard(l){
+  const root=document.createElement('div');root.className='card';
+  root.innerHTML=`<div class="lhead"><span class="dot"></span><div>
+      <div class="lname">${esc(l.name)} <span class="lmeta">· ${esc(l.connector)}</span></div>
+      <div class="lmeta">${esc(l.target||'(no target)')} · ${esc(l.started)}</div></div>
+      <span class="lstat"></span></div>
+    <div class="lbody"><div class="kv"><b>cwd:</b> ${esc(l.cwd)}</div><div class="kv"><b>prompt:</b> ${esc(l.prompt||'—')}</div>
+      <pre class="log">loading…</pre>
+      <div class="intr"><input placeholder="interrupt → stdin + STATE/INTERRUPT.md"><button class="btn sm" data-act="intr">Send</button><button class="btn sm danger" data-act="halt">■ Halt</button></div></div>`;
+  const c={root,id:l.id,dot:root.querySelector('.dot'),stat:root.querySelector('.lstat'),body:root.querySelector('.lbody'),logPre:root.querySelector('pre.log'),intr:root.querySelector('.intr input')};
+  root.querySelector('.lhead').onclick=()=>{if(openCards.has(c.id)){openCards.delete(c.id);c.body.classList.remove('open');}else{openCards.add(c.id);c.body.classList.add('open');logOffsets[c.id]=0;c.logPre.textContent='';pollLog(c.id);}};
+  root.querySelector('[data-act=halt]').onclick=async e=>{e.stopPropagation();const r=await api('/api/halt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:c.id})});toast(r&&r.ok?'halt sent':((r&&r.error)||'unreachable'));};
+  root.querySelector('[data-act=intr]').onclick=async e=>{e.stopPropagation();const r=await api('/api/interrupt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:c.id,prompt:c.intr.value})});if(!r||r.error)toast('⚠ '+((r&&r.error)||'unreachable'));else{toast('interrupt sent'+(r.stdin?' → stdin':' → file'));c.intr.value='';}};
+  return c;
+}
+function syncLaunches(){
+  const box=$('#launchList'),list=STATE.launches||[],live=new Set(list.map(l=>l.id));
+  for(const [id,c] of cardEls){if(!live.has(id)){c.root.remove();cardEls.delete(id);openCards.delete(id);delete logOffsets[id];}}
+  if(!list.length){box.innerHTML='<div class="empty">no launches yet — fire one above</div>';return;}
+  const ph=box.querySelector('.empty');if(ph)ph.remove();
+  list.forEach((l,idx)=>{let c=cardEls.get(l.id);if(!c){c=createCard(l);cardEls.set(l.id,c);}
+    const dc=dotClass(l.status);if(c.dot.dataset.s!==dc){c.dot.className='dot '+dc;c.dot.dataset.s=dc;}
+    if(c.stat.textContent!==l.status)c.stat.textContent=l.status;if(openCards.has(c.id))c.body.classList.add('open');
+    if(box.children[idx]!==c.root)box.insertBefore(c.root,box.children[idx]||null);});
+}
+async function pollLog(id){const c=cardEls.get(id);if(!c||!openCards.has(id))return;
+  const r=await api('/api/log?id='+id+'&offset='+(logOffsets[id]||0));if(!r)return;if(r.error){c.logPre.textContent=r.error;return;}
+  if(r.data){const pre=c.logPre,bottom=pre.scrollTop+pre.clientHeight>=pre.scrollHeight-20;pre.textContent+=r.data;if(bottom)pre.scrollTop=pre.scrollHeight;}
+  logOffsets[id]=r.offset;}
+async function refreshState(){const s=await api('/api/state');if(!s){setOffline(true);return;}setOffline(false);STATE=s;
+  if(!connectors.length){connectors=JSON.parse(JSON.stringify(s.connectors));renderConnectors();}
+  syncLaunches();}
+function setOffline(off){const el=$('#detected');if(off){el.dataset.off='1';el.textContent='⚠ panel offline — retrying…';}
+  else if(el.dataset.off){el.dataset.off='';el.textContent=(STATE.detected&&STATE.detected.length)?('detected: '+STATE.detected.join(', ')):'no agent CLI detected';}}
+
+// poll loop — only while Run is visible
+let tick=0;
+setInterval(()=>{if(!$('#s-run').classList.contains('active'))return;tick++;if(tick%4===1)refreshState();if(tick%2===0)openCards.forEach(pollLog);},500);
+
+// ---------- boot ----------
+(async function boot(){
+  let s=null,n=0;while(!s){s=await api('/api/state');if(s)break;n++;$('#detected').textContent='connecting… ('+n+')';await new Promise(r=>setTimeout(r,600));}
+  STATE=s;connectors=JSON.parse(JSON.stringify(s.connectors));
+  $('#detected').textContent=s.detected.length?('detected: '+s.detected.join(', ')):'no agent CLI detected';
+  renderConnectors();$('#lScope').value=DEFAULT_SCOPE;updateScopeStat();
+  await loadTargets();
+})();
+</script>
+</body>
+</html>
