@@ -428,27 +428,37 @@ def stage_agent(ctx):
     os.makedirs(os.path.dirname(p), exist_ok=True)
     open(p, "w", encoding="utf-8").write(prompt)
     ctx.agent_prompt = p
-    # claude does NOT auto-read a file as its prompt — it must be passed as the first message.
-    # Write a launcher that feeds AGENT_PROMPT.md to claude as the initial message.
+    # Agent-agnostic: default to `claude`, override with --agent <cmd> or $MYTHOS_AGENT
+    # (e.g. deepseek / dsclaude / aider / any CLI). An agent that wants the prompt on stdin
+    # instead of as an argument: set MYTHOS_AGENT_STDIN=1.
+    agent = ctx.opts.get("agent") or os.environ.get("MYTHOS_AGENT") or "claude"
     launcher = ctx.tdir("reports", "launch_agent.sh")
     open(launcher, "w", encoding="utf-8").write(
         "#!/usr/bin/env bash\n"
-        "# Launch Claude Code in this target with the MYTHOS prompt as the first message.\n"
+        "# Launch your AI agent in this target with the MYTHOS prompt as the first message.\n"
+        "# Override the agent: export MYTHOS_AGENT='deepseek'  (or pass --agent to mythos).\n"
+        "# Prompt via stdin instead of argv: export MYTHOS_AGENT_STDIN=1\n"
         'cd "%s" || exit 1\n'
-        'exec claude "$(cat reports/AGENT_PROMPT.md)"\n' % ctx.tdir())
+        'AGENT="${MYTHOS_AGENT:-%s}"\n'
+        'PROMPT="$(cat reports/AGENT_PROMPT.md)"\n'
+        'if [ -n "${MYTHOS_AGENT_STDIN:-}" ]; then printf "%%s" "$PROMPT" | $AGENT; '
+        'else $AGENT "$PROMPT"; fi\n' % (ctx.tdir(), agent))
     try:
         os.chmod(launcher, 0o755)
     except Exception:
         pass
     launched = False
-    if ctx.opts.get("launch_agent") and shutil.which("claude") and ctx.authorized:
-        try:
-            subprocess.Popen(["claude", prompt], cwd=ctx.tdir())   # pass prompt as first message
-            launched = True
-        except Exception:
-            launched = False
-    note = ("context package -> %s ; LAUNCH: bash %s  (feeds the prompt to claude)%s"
-            % (p, launcher, " ; launched" if launched else ""))
+    if ctx.opts.get("launch_agent") and ctx.authorized:
+        import shlex
+        argv0 = shlex.split(agent)
+        if shutil.which(argv0[0]):
+            try:
+                subprocess.Popen(argv0 + [prompt], cwd=ctx.tdir())   # prompt as first message
+                launched = True
+            except Exception:
+                launched = False
+    note = ("context package -> %s ; LAUNCH: bash %s  (feeds the prompt to '%s')%s"
+            % (p, launcher, agent, " ; launched" if launched else ""))
     return "SUCCESS", {"note": note, "artifacts": [p, launcher]}
 
 
@@ -608,6 +618,7 @@ def parse_opts(argv):
         elif a == "--no-enum": opts["no_enum"] = True
         elif a == "--quiet": opts["quiet"] = True
         elif a == "--launch-agent": opts["launch_agent"] = True
+        elif a == "--agent": opts["agent"] = argv[i + 1]; i += 1
         elif a == "--top": opts["top"] = int(argv[i + 1]); i += 1
         elif a == "--enum-timeout": opts["enum_timeout"] = int(argv[i + 1]); i += 1
         elif a == "--troot": opts["troot"] = argv[i + 1]; i += 1

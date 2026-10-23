@@ -224,6 +224,37 @@ components, server-controlled values, forgotten-auth and secrets-to-sink.
 
 ---
 
+## 7b. Using a non-Claude agent (DeepSeek, Grok, …)
+
+MYTHOS has two layers, coupled to the AI differently:
+
+**Tooling + prompt — agent-agnostic (works with any model today).** `mythos`, `enum_pipeline`,
+`rank_surface`, etc. are plain bash/python. `mythos` writes `reports/AGENT_PROMPT.md` (just
+text). Point the launcher at your agent's CLI:
+```bash
+export MYTHOS_AGENT='deepseek'          # or: mythos <target> --agent deepseek
+export MYTHOS_AGENT_STDIN=1             # if your CLI wants the prompt on stdin, not as an arg
+mythos acme.com --authorized
+bash ~/targets/acme.com/reports/launch_agent.sh     # now launches `deepseek "<prompt>"`
+```
+If your agent has no CLI, just open `AGENT_PROMPT.md` and paste it into the chat, and run the
+shell tools yourself (or let the agent call them through its own tool-use).
+
+**Hooks — need a hook-capable harness.** The 12 discipline hooks fire on Claude Code's
+`SessionStart`/`PreToolUse`/`PreCompact`/`Stop` events. To get them on another agent, its runner
+must have an equivalent lifecycle; then you wire the same scripts to its events. The hook scripts
+are **edition-agnostic** (they resolve state relative to their own dir), so a new edition is just
+a copy:
+```bash
+cp -r engine/kimi-mythos ~/.deepseek/mythos      # ready-made template; byte-identical hooks
+# then in your agent's config: load engine/CLAUDE.core.md as its system prompt / rules, and map
+# session-start → session_start.sh, pre-tool → pretooluse_guard.py + the PreToolUse hooks,
+# post-tool → journal.py + the PostToolUse hooks, stop → stop_guard.sh + ceiling_gate.py
+```
+Without a hook layer you still get the doctrine (load `CLAUDE.core.md` / `MYTHOS_CLAUDE_OS.txt`
+as the system prompt) and all the tooling — you just lose the automatic guards. The Lounge
+multi-agent layer already defines non-Claude seats (`dsclaude`, `grok3`, `kimi`).
+
 ## 8. Safety & scope
 
 - **Authorized-scope only.** `enum_pipeline.sh` targets only the roots parsed from `SCOPE.md`;
