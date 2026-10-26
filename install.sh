@@ -55,6 +55,14 @@ if [ ! -f "$HOME/targets/_gate/hooks/gate_hook.py" ]; then
   chmod +x "$HOME/targets/_gate/hooks/gate_hook.py"; echo "created stub"
 else echo "kept existing gate_hook.py"; fi
 
+say "4b. Rewrite /home/RESEARCHER -> \$HOME in installed doctrine/skills (so it grounds for THIS user)"
+find "$HOME/.claude/mythos" "$HOME/.claude/skills" "$HOME/.kimi-code/mythos" "$HOME/.grok/rules" \
+     "$HOME/targets/_shared" \
+     -type f \( -name '*.md' -o -name '*.txt' -o -name '*.py' -o -name '*.sh' -o -name '*.json' \) \
+     -print0 2>/dev/null | xargs -0 -r sed -i "s#/home/RESEARCHER#$HOME#g"
+sed -i "s#/home/RESEARCHER#$HOME#g" "$HOME/.claude/CLAUDE.md" "$HOME/MYTHOS_CLAUDE_OS.txt" 2>/dev/null || true
+echo "rewrote RESEARCHER paths -> $HOME"
+
 say "5. Merge hooks into ~/.claude/settings.json"
 python3 - "$SRC/engine/hooks-config/settings.json" "$HOME/.claude/settings.json" "$HOME" "$FULL" <<'PY'
 import json, sys, os
