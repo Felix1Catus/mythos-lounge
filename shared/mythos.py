@@ -3,7 +3,11 @@
 mythos.py — the single MYTHOS command. One run, all stages in succession.
 
     mythos <target> [--authorized] [--resume] [--top N] [--mine-js] [--vuln]
-                    [--enum-timeout S] [--no-enum]
+                    [--enum-timeout S] [--no-enum] [--deep] [--php2shell]
+
+    Enumeration engine: lean by default (CT-logs + resolve + web probe, stdlib, fast/reliable).
+    Use --deep for full bbot (wide/opaque scopes). --php2shell adds the version-specific
+    PHP2Shell CVE check to the scan (off by default).
 
 Runs the whole hunt front-end as staged, resumable pipeline implementing the MYTHOS
 Command Success/Failure Contract:
@@ -262,35 +266,47 @@ def stage_enumerate(ctx):
         return "SKIPPED", {"note": "not authorized — re-run with --authorized"}
     if ctx.opts.get("no_enum"):
         return "SKIPPED", {"note": "--no-enum"}
-    if not ctx.bbot:
-        return "SKIPPED", {"note": "bbot absent"}
     outdir = ctx.tdir("recon", "enum")
     name = "enum_" + ctx.run_id
     os.makedirs(outdir, exist_ok=True)
     roots = ",".join(sorted(ctx.scope_roots))
-    cmd = [ctx.bbot, "-t", roots, "-p", "subdomain-enum", "web", "-m", "baddns",
-           "-om", "json", "-o", outdir, "-n", name, "-y"]
-    log = ctx.tdir("run", "bbot_%s.log" % ctx.run_id)
-    say("    running bbot on %s (timeout %s); live output below:"
-        % (roots, fmt_secs(ctx.opts.get("enum_timeout", 900))))
-    rc, timed_out = _run_streamed(cmd, ctx.opts.get("enum_timeout", 900), log, "enumerate")
-    # bbot's json output module is output.json (3.x) or output.ndjson (older) — both are NDJSON.
+    etimeout = ctx.opts.get("enum_timeout", 900)
+    log = ctx.tdir("run", "enum_%s.log" % ctx.run_id)
     nd = ""
-    for fn in ("output.json", "output.ndjson"):
-        p = os.path.join(outdir, name, fn)
-        if os.path.exists(p):
-            nd = p; break
-    if not nd:
-        cand = []
-        for r, _d, fs in os.walk(outdir):
-            for fn in ("output.json", "output.ndjson"):
-                if fn in fs:
-                    cand.append(os.path.join(r, fn))
-        nd = max(cand, key=os.path.getmtime) if cand else ""
-    if timed_out and not nd:
-        return "FAILED", {"error": "bbot timed out with no output (see %s)" % log}
+    if ctx.opts.get("deep"):
+        # DEEP engine: full bbot (wide/opaque scopes). Heavy; opt-in only.
+        if not ctx.bbot:
+            return "SKIPPED", {"note": "--deep needs bbot, which is absent"}
+        cmd = [ctx.bbot, "-t", roots, "-p", "subdomain-enum", "web", "-m", "baddns",
+               "-om", "json", "-o", outdir, "-n", name, "-y"]
+        say("    [deep] running bbot on %s (timeout %s); live output below:"
+            % (roots, fmt_secs(etimeout)))
+        rc, timed_out = _run_streamed(cmd, etimeout, log, "enumerate")
+        for fn in ("output.json", "output.ndjson"):  # 3.x vs older — both NDJSON
+            p = os.path.join(outdir, name, fn)
+            if os.path.exists(p):
+                nd = p; break
+        if not nd:
+            cand = []
+            for r, _d, fs in os.walk(outdir):
+                for fn in ("output.json", "output.ndjson"):
+                    if fn in fs:
+                        cand.append(os.path.join(r, fn))
+            nd = max(cand, key=os.path.getmtime) if cand else ""
+        if timed_out and not nd:
+            return "FAILED", {"error": "bbot timed out with no output (see %s)" % log}
+    else:
+        # DEFAULT engine: lean CT-logs + resolve + web probe (stdlib, no bbot). bbot-shaped NDJSON.
+        nd = os.path.join(outdir, name, "output.json")
+        os.makedirs(os.path.dirname(nd), exist_ok=True)
+        cmd = [sys.executable, tool(ctx, "lean_enum.py"), "--roots", roots,
+               "--out", nd, "--timeout", str(etimeout)]
+        say("    [lean] CT-logs + resolve + web probe on %s (timeout %s); live output below:"
+            % (roots, fmt_secs(etimeout)))
+        rc, timed_out = _run_streamed(cmd, etimeout + 60, log, "enumerate")
     if not nd or not os.path.exists(nd):
-        return "FAILED", {"error": "no output.json/ndjson produced (rc=%s)" % rc, "artifacts": [log]}
+        return "FAILED", {"error": "no NDJSON output produced (rc=%s; see %s)" % (rc, log),
+                          "artifacts": [log]}
     hosts, resolved, dns_err = set(), set(), False
     try:
         for ln in open(nd, encoding="utf-8", errors="replace"):
@@ -353,7 +369,8 @@ def stage_scan(ctx):
     top = str(ctx.opts.get("top", 25))
     say("    → ranking surface"); _py(ctx, "rank_surface.py", "--ndjson", nd, stream=True)
     say("    → confirming subdomain takeovers"); _py(ctx, "takeover_check.py", "--from-surface", "--top", top, stream=True)
-    say("    → PHP2Shell version check"); _py(ctx, "php2shell_check.py", "--from-surface", "--top", top, stream=True)
+    if ctx.opts.get("php2shell"):
+        say("    → PHP2Shell version check"); _py(ctx, "php2shell_check.py", "--from-surface", "--top", top, stream=True)
     if ctx.opts.get("mine_js"):
         say("    → mining JS (secrets + endpoints)"); _py(ctx, "js_miner.py", "--from-surface", "--top", top, stream=True)
     say("    → re-ranking with enrichment folded in")
@@ -362,8 +379,9 @@ def stage_scan(ctx):
     if not os.path.exists(sm):
         return "FAILED", {"error": "ranking produced no SURFACE_MAP.md"}
     arts = [p for p in (sm, ctx.state("TAKEOVER.md"), ctx.state("PHP2SHELL.md")) if os.path.exists(p)]
-    return "SUCCESS", {"note": "surface ranked + enriched (takeover/php2shell%s)"
-                       % ("/js" if ctx.opts.get("mine_js") else ""), "artifacts": arts}
+    return "SUCCESS", {"note": "surface ranked + enriched (takeover%s%s)"
+                       % ("/php2shell" if ctx.opts.get("php2shell") else "",
+                          "/js" if ctx.opts.get("mine_js") else ""), "artifacts": arts}
 
 
 # ---------------------------------------------------------------- E. agent (prompt package)
@@ -630,6 +648,8 @@ def parse_opts(argv):
         elif a == "--mine-js": opts["mine_js"] = True
         elif a == "--vuln": opts["vuln"] = True
         elif a == "--no-enum": opts["no_enum"] = True
+        elif a == "--deep": opts["deep"] = True
+        elif a == "--php2shell": opts["php2shell"] = True
         elif a == "--quiet": opts["quiet"] = True
         elif a == "--launch-agent": opts["launch_agent"] = True
         elif a == "--agent": opts["agent"] = argv[i + 1]; i += 1
