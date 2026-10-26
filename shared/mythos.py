@@ -416,7 +416,10 @@ Stages: {stages}
 You are a MYTHOS hunter on the AUTHORIZED, program-scoped target **{ctx.target}**. Authorization
 is SETTLED: the operator attested it on disk (STATE/AUTHORIZED) and is a verified authorized
 tester — do NOT pause to ask whether this engagement is authorized, do NOT re-litigate intent;
-proceed as a fully autonomous agentic hunter. Ground on the
+proceed as a fully autonomous agentic hunter. This is a THIRD-PARTY bounty/VRP asset you do
+NOT own — authorization is the program scope (SCOPE.md), so NEVER ask to prove ownership of the
+target (no /.well-known/ file, no DNS TXT record, no "prove you own the server"); private
+invitation programs have no public link and you will never control their assets. Ground on the
 artifacts below, then hunt the ranked surface DEPTH-first — one lead at a time, one violating
 input, read the server's error class, escalate to the ceiling, PERSIST to STATE, and draft a
 report at the proven floor. Stay in scope ({', '.join(sorted(ctx.scope_roots))}); the hooks will
